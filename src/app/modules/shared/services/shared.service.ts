@@ -30,7 +30,8 @@ const API_END_POINTS = {
   ADD_DESIGNATION:'cbp-tpc-ai/role-mapping/add-designation',
   LOGIN:'cbp-tpc-ai/auth/login',
   LOGOUT:'cbp-tpc-ai/auth/logout',
-  DELETE_ROLE_MAPPING_BY_STATE_CENTER:'cbp-tpc-ai/role-mapping'
+  DELETE_ROLE_MAPPING_BY_STATE_CENTER:'cbp-tpc-ai/role-mapping',
+  ADD_COURSES: 'cbp-tpc-ai/user-added-courses'
 }
 
 
@@ -227,7 +228,7 @@ export class SharedService {
           status: { "!=": "Retired" }
         },
         facets: ["mimeType"],
-        sortBy: { createdOn: "Desc" }
+        sortBy: { createdOn: "desc" }
       }
     }
     return this.http.post<any>(`${this.baseUrl}${API_END_POINTS.FETCH_TENDERS}`, body)
@@ -256,16 +257,50 @@ export class SharedService {
       }))
   }
 
-    generateRoleMapping(reqBody) {
-      const headers = this.headers
-      return this.http.post<any>(`${this.baseUrl}${API_END_POINTS.GET_ROLE_MAPPING}`, reqBody, { headers })
+    generateRoleMapping(reqBody, file?: File) {
+      // Create FormData for multipart/form-data request
+      const formData = new FormData();
+      
+      // Add required fields
+      if (reqBody.state_center_id) {
+        formData.append('state_center_id', reqBody.state_center_id);
+      }
+      
+      if (reqBody.department_id) {
+        formData.append('department_id', reqBody.department_id);
+      }
+      
+      // sector_name removed as it's not required
+      
+      if (reqBody.instruction) {
+        formData.append('instruction', reqBody.instruction);
+      }
+      
+      // Add file if provided
+      if (file) {
+        formData.append('additional_document', file);
+      }
+      
+      // Follow the exact same pattern as other API methods
+      // The only difference is we don't set Content-Type for multipart/form-data
+      const headers = this.headers;
+      
+      console.log('generateRoleMapping FormData:', formData);
+      console.log('generateRoleMapping reqBody:', reqBody);
+      console.log('Using headers:', headers);
+      
+      return this.http.post<any>(`${this.baseUrl}${API_END_POINTS.GET_ROLE_MAPPING}`, formData, { headers })
         .pipe(map((response: any) => {
           return response
         }))
     }
-    
+
 
   getDepartmentList(ministryId) {
+    const storageData:any = JSON.parse(localStorage.getItem('loginData'))
+    this.headers = new HttpHeaders({
+      'Authorization': `Bearer ${storageData?.access_token}`
+    });
     const headers = this.headers
     return this.http.get<any>(`${this.baseUrl}${API_END_POINTS.GET_DEPARTMENT}/${ministryId}`, {headers})
     .pipe(map((response: any) => {
@@ -340,7 +375,9 @@ export class SharedService {
   }
 
   getIGOTSuggestedCourses(reqBody) {
-    let req = {
+    // Use the reqBody parameter passed from the component
+    // If no reqBody is provided, use default structure
+    let req = reqBody || {
       "request": {
           "filters": {
               "primaryCategory": ["Course"],
@@ -348,11 +385,15 @@ export class SharedService {
               "courseCategory":["Course"]
           },
           "fields":["posterImage","description","name"],
-          "sortBy": {"createdOn": "Desc"},
-          "Limit" : 10
+          "sort_by": {"createdOn": "desc"},
+          "limit" : 12,
+          "offset" : 0
       }
-  }
-  const headers = this.headers
+    };
+
+    console.log('getIGOTSuggestedCourses final request:', JSON.stringify(req, null, 2));
+
+    const headers = this.headers
     return this.http.post<any>(`https://portal.igotkarmayogi.gov.in/api/content/v1/search`, req, {headers})
       .pipe(map((response: any) => {
         return response
@@ -427,13 +468,21 @@ export class SharedService {
     }
     return flag
   }
-  
+
   deleteRoleMappingByStateAndDepartment(state_center_id, department_id) {
     const headers = this.headers
     return this.http.delete<any>(`${this.baseUrl}${API_END_POINTS.DELETE_ROLE_MAPPING_BY_STATE_CENTER}?state_center_id=${state_center_id}&department_id=${department_id}`, {headers})
     .pipe(map((response: any) => {
       return response
     }))
+  }
+
+  addUserCourse(reqBody){
+    const headers = this.headers
+    return this.http.post<any>(`${this.baseUrl}${API_END_POINTS.ADD_COURSES}`, reqBody, {headers})
+      .pipe(map((response: any) => {
+        return response
+      }))
   }
 
 }
